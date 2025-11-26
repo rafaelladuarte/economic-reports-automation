@@ -34,8 +34,6 @@ Cada relatório econômico monitorado possui seu próprio módulo independente.
 * 🏛️ *[Estudos Especiais - Banco Central](https://www.bcb.gov.br/publicacoes/estudosespeciais)*
 * 📈 Relatórios e boletins adicionais de instituições públicas e privadas
 
-Essa organização permite adicionar novas fontes ao repositório sem modificar a arquitetura principal.
-
 ## 🛠️ Tecnologias Utilizadas
 
 O projeto funciona inteiramente dentro do ecossistema Google utilizando:
@@ -68,8 +66,6 @@ O projeto funciona inteiramente dentro do ecossistema Google utilizando:
 * Adição de novos relatórios econômicos (FGV, BACEN, IPEA e outros).
 * Implementação de **resumos automáticos com modelos de linguagem (LLM)**.
 * Exportação de dados para planilhas Google de forma estruturada.
-* Envio opcional para Telegram, WhatsApp ou API externa.
-* Monitoramento baseado em mudança de conteúdo (hash) em vez de datas.
 
 ## ⚙️ Como Configurar
 
