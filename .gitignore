@@ -1,0 +1,43 @@
+# Node modules
+node_modules/
+
+# Build artifacts
+dist/
+build/
+.next/ # For Next.js projects
+.nuxt/ # For Nuxt.js projects
+out/ # Common for various build outputs
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Log files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Editor and OS specific files
+.DS_Store # macOS
+Thumbs.db # Windows
+.vscode/ # VS Code specific settings (optional, depending on project needs)
+
+# Cache directories
+.cache/
+.parcel-cache/ # Parcel bundler cache
+
+# Test coverage reports
+coverage/
+
+# IDE specific files
+.idea/ # IntelliJ IDEA
+*.iml # IntelliJ IDEA
+
+# Other potentially ignored files
+*.tgz # npm packed modules
+.pnp.* # Yarn PnP files
+.yarn/ # Yarn v3 files (except for .yarn/releases and .yarn/plugins)

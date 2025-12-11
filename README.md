@@ -25,11 +25,11 @@ Ideal para quem trabalha com dados, pesquisa econômica, análise de conjuntura 
 Cada relatório econômico monitorado possui seu próprio módulo independente.
 **Módulos atuais:**
 
-* 📄 *[Carta de Conjuntura — IPEA](https://www.ipea.gov.br/cartadeconjuntura/)* (implementado)
+* 📄 *[Carta de Conjuntura — IPEA](https://www.ipea.gov.br/cartadeconjuntura/)*
+* 📄 *[Revista Conjuntura Econômica — FGV](https://portalibre.fgv.br/revista-conjuntura-economica)*
 
 **Próximos módulos planejados:**
 
-* 📘 *[Revista Conjuntura - FGV](https://portalibre.fgv.br/revista-conjuntura-economica)*
 * 📊 *[Boletim Macro- FGV](https://portalibre.fgv.br/boletim-macro)*
 * 🏛️ *[Estudos Especiais - Banco Central](https://www.bcb.gov.br/publicacoes/estudosespeciais)*
 * 📈 Relatórios e boletins adicionais de instituições públicas e privadas
