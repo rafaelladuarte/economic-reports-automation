@@ -130,20 +130,46 @@ function enviarRelatorioPorEmail() {
   const assunto = `Relatório IPEA: ${dadosRelatorio.titulo} (${dadosRelatorio.data})`;
   
   const corpoEmail = `
-    <h1>Relatório Carta de Conjuntura IPEA</h1>
-    
-    <h2>${dadosRelatorio.titulo}</h2>
-    <p><strong>Data de Publicação:</strong> ${dadosRelatorio.data}</p>
-    
-    <h3>Resumo:</h3>
-    <pre style="white-space: pre-wrap; font-family: sans-serif;">${dadosRelatorio.resumo}</pre>
-    
-    <p>
-      <strong>Link PDF:</strong> <a href="${dadosRelatorio.linkPdf}">${dadosRelatorio.linkPdf}</a>
+    <div style="font-family: Arial, Helvetica, sans-serif; background-color: #f5f6f8; padding: 24px;">
+  <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; border-radius: 6px; padding: 24px;">
+
+    <h1 style="margin: 0 0 8px 0; font-size: 22px; color: #1f2937;">
+      Relatório Carta de Conjuntura – IPEA
+    </h1>
+
+    <h2 style="margin: 0 0 16px 0; font-size: 18px; font-weight: normal; color: #374151;">
+      ${dadosRelatorio.titulo}
+    </h2>
+
+    <p style="margin: 0 0 20px 0; font-size: 14px; color: #4b5563;">
+      <strong>Data de publicação:</strong> ${dadosRelatorio.data}
     </p>
-    <p>
-      <em>Este e-mail foi gerado automaticamente pelo Google Apps Script.</em>
+
+    <h3 style="margin: 0 0 8px 0; font-size: 16px; color: #1f2937;">
+      Resumo
+    </h3>
+
+    <div style="background-color: #f9fafb; border-left: 4px solid #2563eb; padding: 12px 16px; margin-bottom: 20px;">
+      <p style="margin: 0; font-size: 14px; line-height: 1.6; color: #374151; white-space: pre-wrap;">
+        ${dadosRelatorio.resumo}
+      </p>
+    </div>
+
+    <p style="margin: 0 0 24px 0; font-size: 14px;">
+      <strong>Link para o PDF:</strong><br>
+      <a href="${dadosRelatorio.linkPdf}" style="color: #2563eb; text-decoration: none;">
+        ${dadosRelatorio.linkPdf}
+      </a>
     </p>
+
+    <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
+
+    <p style="margin: 0; font-size: 12px; color: #6b7280;">
+      Este e-mail foi gerado automaticamente pelo Google Apps Script.
+    </p>
+
+  </div>
+</div>
   `;
   
   const corpoTextoSimples = `Relatório IPEA: ${dadosRelatorio.titulo}\n\nData: ${dadosRelatorio.data}\n\nResumo:\n${dadosRelatorio.resumo}\n\nLink: ${dadosRelatorio.link}`;

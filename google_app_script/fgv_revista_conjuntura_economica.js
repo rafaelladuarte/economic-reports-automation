@@ -1,6 +1,7 @@
 /*************************************************************
  * Scraper FGV Revista Conjuntura Econômica - Google Apps Script
- * - Faz fetch com headers e cookies
+ * - Faz fetch com headers e cookies (fornecidos)
+ * - Detecta anti-bot
  * - Extrai seções e artigos
  * - Renderiza HTML
  * - Envia e-mail com htmlBody = HTML renderizado
@@ -11,7 +12,7 @@
    ====================== */
 
 // COOKIES: string que você forneceu (já concatenada)
-const COOKIES_STATIC = '_gcl_au=1.1.1927393907.1762952821; _hjSessionUser_5310947=eyJpZCI6ImM0ZmFjNmY3LTAwMWYtNTVjNS04NGMxLWQ1ZmRjMGMxODE1NyIsImNyZWF0ZWQiOjE3NjI5NTI4MjA4MTksImV4aXN0aW5nIjp0cnVlfQ==; fgv_lgpd_agreement=ok; _gid=GA1.2.1581351493.1765403340; _gat_UA-5652209-23=1; _hjSession_5310947=eyJpZCI6ImUzYmVmMTUwLTU0NDctNGE1OS05YTMwLTA3ZDBiMDdjZmIxNyIsImMiOjE3NjU0MDc1OTIzOTMsInMiOjAsInIiOjAsInNiIjowLCJzciI6MCwic2UiOjAsImZzIjowLCJzcCI6MH0=; _ga_NFDKH7ZWK7=GS2.1.s1765407591$o4$g1$t1765407592$j59$l0$h0; _ga=GA1.1.814569633.1762952821; _ga_D09E8P2WEF=GS2.2.s1765407592$o4$g0$t1765407592$j60$l0$h0';
+const COOKIES_STATIC = '_gcl_au=1.1.1927393907.1762952821; _hjSessionUser_5310947=eyJpZCI6ImM0ZmFjNmY3LTAwMWYtNTVjNS04NGMxLWQ1ZmRjMGMxODE1NyIsImNyZWF0ZWQiOjE3NjI5NTI4MjA4MTksImV4aXN0aW5nIjp0cnVlfQ==; _gid=GA1.2.932457876.1767030411; _ga_NFDKH7ZWK7=GS2.1.s1767030410$o6$g0$t1767030410$j60$l0$h0; _ga=GA1.1.814569633.1762952821; _hjSession_5310947=eyJpZCI6IjQ5MTMyYmI5LWNiOTAtNDFiOC1hYTJhLWExNDY4YjczZDEyOSIsImMiOjE3NjcwMzA0MTA5NTgsInMiOjAsInIiOjAsInNiIjowLCJzciI6MCwic2UiOjAsImZzIjowLCJzcCI6MH0=; _ga_D09E8P2WEF=GS2.2.s1767030411$o6$g0$t1767030411$j60$l0$h0; fgv_lgpd_agreement=ok';
 
 // User-Agent (uso padrão, você pode alterar se desejar)
 const DEFAULT_USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36';
@@ -19,14 +20,29 @@ const DEFAULT_USER_AGENT = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (
 // URL alvo
 const URL_FGV = 'https://portalibre.fgv.br/revista-conjuntura-economica';
 
+// ID DA PLANILHA DE CONTROLE
+const SPREADSHEET_ID = ""
+
+
 /* ======================
    FLUXO PRINCIPAL
    ====================== */
 function executarScraper() {
   Logger.log('Iniciando processo de extração da Revista Conjuntura Econômica...');
   // 1) Buscar HTML da página principal usando headers + cookies
+  const mesCorrente = Utilities.formatDate(
+    new Date(),
+    Session.getScriptTimeZone(),
+    "yyyy-MM"
+  );
+
+  if (jaFoiEnviadoNoMes(mesCorrente)) {
+    Logger.log("E-mail já enviado para este mês. Abortando execução.");
+    return;
+  }
+
   const html = fetchPaginaFGV(URL_FGV);
-  
+
   // 2) Extrair dados
   const dados = extrairDadosRevista(html);
 
@@ -39,11 +55,12 @@ function executarScraper() {
     return { status: 'Ignorado', mensagem: msg }; 
   }
 
-  // 4) Enviar e-mail (corpo = HTML renderizado)
-  const envio = enviarRelatorioPorEmail(dados, htmlDoEmail);
+    // 4) Enviar e-mail (corpo = HTML renderizado)
+    const envio = enviarRelatorioPorEmail(dados, htmlDoEmail);
 
-  Logger.log('Processo finalizado. Resultado do envio: ' + JSON.stringify(envio));
-  return { status: 'OK', envio, dadosResumo: { tituloEdicao: dados.tituloEdicao } };
+    Logger.log('Processo finalizado. Resultado do envio: ' + JSON.stringify(envio));
+    registrarEnvioPlanilha(mesCorrente, dados.capaRevista.link);
+    return { status: 'OK', envio, dadosResumo: { tituloEdicao: dados.tituloEdicao } };
 }
 
 /* ======================
@@ -91,146 +108,186 @@ function fetchPaginaFGV(url) {
   }
 }
 
+/* ======================
+   DETECÇÃO ANTI-BOT
+   ====================== */
+function isAntiBot(html) {
+  if (!html) return true;
+  const lower = html.toLowerCase();
+
+  // padrões comuns de páginas de proteção
+  const indicators = [
+    'antibot',
+    'please enable javascript',
+    'captcha',
+    'cf-chl-bypass',
+    'cf-challenge',
+    'bot detection',
+    'noscript',
+    'antibot-message',
+    'you are verifying',
+    'verify you are human'
+  ];
+
+  for (let i = 0; i < indicators.length; i++) {
+    if (lower.indexOf(indicators[i]) !== -1) {
+      Logger.log('Indicador anti-bot detectado: ' + indicators[i]);
+      return true;
+    }
+  }
+
+  // Adicional: páginas muito curtas ou com <noscript><style> forms
+  if (lower.indexOf('<noscript') !== -1 && lower.indexOf('form.antibot') !== -1) {
+    Logger.log('Estrutura noscript/antibot detectada.');
+    return true;
+  }
+
+  return false;
+}
 
 /* ======================
-   EXTRAÇÃO DE DADOS
+   EXTRAÇÃO DE DADOS (sem bibliotecas externas)
+   - utiliza regex e fetch adicional para resumos
    ====================== */
-function extrairDadosRevista(html) {
-  
-  var resultado = {
+
+  function extrairDadosRevista(html) {
+  const resultado = {
     tituloEdicao: null,
-    sumario: { artigos: [] },
-    cartaIbre: {},
-    notaDoEditor: {},
-    capa: {}
+    sumario: {
+      cartaDoIbre: null,
+      pontoDeVista: null,
+      entrevista: null,
+      capa: null,
+      artigos: []
+    },
+    cartaIbre: {
+      autor: null,
+      resumo: null,
+      link: null
+    },
+    notaEditor: {
+      texto: null,
+      link: null
+    },
+    capaRevista: {
+      imagem: null,
+      link: null
+    }
   };
 
-  // --- 1. Extração do Sumário (Bloco 1) ---
-  
-  // Localiza a seção de sumário: div com id 'block-views-block-revista-conjuntura-block-1'
-  var regexSumarioBloco = /id="block-views-block-revista-conjuntura-block-1"[\s\S]*?views-row"><div class="views-field views-field-field-revista-sumario">([\s\S]*?)<\/div><div class="views-field views-field-edit-node">/;
-  var matchSumarioBloco = html.match(regexSumarioBloco);
-  
-  if (matchSumarioBloco && matchSumarioBloco[1]) {
-    var sumarioHtml = matchSumarioBloco[1];
+  // ======================================================
+  // TÍTULO DA EDIÇÃO (original)
+  // ======================================================
+  const tituloMatch = html.match(
+    /field--name-field-titulo[^>]*>\s*([^<]+?)\s*<\/div>/
+  );
+  if (tituloMatch) {
+    resultado.tituloEdicao = tituloMatch[1].trim();
+  }
 
-    // A. Título da Edição (dentro do sumário)
-    var regexTituloEdicao = /rotulo-default[^>]*>([\s\S]*?)<\/div>/;
-    var matchTitulo = sumarioHtml.match(regexTituloEdicao);
-    if (matchTitulo && matchTitulo[1]) {
-      var tituloEdicao = limparTexto(matchTitulo[1]);
-      resultado.tituloEdicao = tituloEdicao;
-      resultado.sumario.tituloEdicao = tituloEdicao;
+  // ======================================================
+  // SUMÁRIO — BLOCO INTERNO (AJUSTADO)
+  // ======================================================
+  const sumarioMatch = html.match(
+    /views-field-field-revista-sumario[\s\S]*?<div class="field[^"]*field--name-field-texto[^"]*field__item">([\s\S]*?)<\/div>\s*<\/div>\s*<\/div>/i
+  );
+
+  if (sumarioMatch) {
+    const textoSumario = sumarioMatch[1];
+
+    function extrairSecaoSumario(nome) {
+      const regex = new RegExp(
+        `<h2>\\s*<strong>${nome}<\\/strong>\\s*<\\/h2>[\\s\\S]*?<h3>\\s*<strong>([\\s\\S]*?)<\\/strong>[\\s\\S]*?<\\/h3>[\\s\\S]*?<p[^>]*>([\\s\\S]*?)<\\/p>`,
+        "i"
+      );
+
+      const match = textoSumario.match(regex);
+      if (!match) return null;
+
+      return {
+        titulo: match[1].replace(/\s+/g, " ").trim(),
+        resumo: match[2].replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim()
+      };
     }
 
-    // B. Conteúdo Principal do Sumário (Seções e Artigos)
-    var regexConteudoSumario = /field--name-field-texto[^>]*>([\s\S]*?)<\/div>/;
-    var matchConteudo = sumarioHtml.match(regexConteudoSumario);
-    
-    if (matchConteudo && matchConteudo[1]) {
-      var conteudoTexto = matchConteudo[1];
-      
-      // Simplifica o HTML interno para facilitar a análise linha por linha
-      var textoLimpo = conteudoTexto
-        .replace(/<p>\s*<strong>/g, '\n**') // Marcar início de Títulos/Seções
-        .replace(/<\/strong>/g, '**\n')    // Marcar fim de Títulos/Seções
-        .replace(/<p><em>/g, '\n$$')       // Marcar início de Autores (que estão em <em>)
-        .replace(/<\/em><\/p>/g, '$$\n')   // Marcar fim de Autores
-        .replace(/<p>/g, '\n')             // Quebra de linha para outros parágrafos
-        .replace(/<\/p>/g, '')
-        .replace(/\s\s+/g, ' ');           // Limpeza geral
-      
-      var linhas = textoLimpo.split('\n').filter(function(line) { return line.trim().length > 0; });
-      
-      var processandoArtigos = false;
-      var artigoAtual = null;
+    resultado.sumario.cartaDoIbre  = extrairSecaoSumario("Carta do IBRE");
+    resultado.sumario.pontoDeVista = extrairSecaoSumario("Ponto de Vista");
+    resultado.sumario.entrevista   = extrairSecaoSumario("Entrevista");
+    resultado.sumario.capa         = extrairSecaoSumario("CAPA");
 
-      for (var i = 0; i < linhas.length; i++) {
-        var linha = linhas[i].trim();
-        
-        if (linha.includes('**Artigos**')) {
-          processandoArtigos = true;
-          continue;
-        }
+    // -------- LISTA DE ARTIGOS (AJUSTADA) --------
+    const artigosMatch = textoSumario.match(
+      /<h2>\s*Artigos\s*<\/h2>([\s\S]*)$/i
+    );
 
-        var matchSecao = linha.match(/\*\*(Carta do IBRE|Ponto de Vista|Entrevista|Fiscal|CAPA)\s*\|\s*(.*?)\*\*/);
-        
-        if (matchSecao) {
-          // É uma seção fixa
-          var tipo = matchSecao[1];
-          var tituloCompleto = limparTexto(matchSecao[0].replace(/\*\*/g, ''));
-          
-          switch (tipo) {
-            case 'Carta do IBRE':
-              resultado.sumario.cartaDoIbre = tituloCompleto;
-              break;
-            case 'Ponto de Vista':
-              resultado.sumario.pontoDeVista = tituloCompleto;
-              break;
-            case 'Entrevista':
-              resultado.sumario.entrevista = tituloCompleto;
-              break;
-            case 'Fiscal':
-              resultado.sumario.fiscal = tituloCompleto;
-              break;
-            case 'CAPA':
-              resultado.sumario.capa = tituloCompleto;
-              break;
-          }
-        } else if (processandoArtigos) {
-          // Extração de Artigos e Autores
-          if (linha.startsWith('**') && linha.endsWith('**')) {
-            // Nova linha de Título de Artigo
-            if (artigoAtual) {
-              resultado.sumario.artigos.push(artigoAtual);
-            }
-            artigoAtual = {
-              titulo: limparTexto(linha.replace(/\*\*/g, '')),
-              autor: null
-            };
-          } else if (linha.startsWith('$$') && linha.endsWith('$$') && artigoAtual) {
-            // Linha de Autor
-            artigoAtual.autor = limparTexto(linha.replace(/\$\$/g, ''));
-          }
-        }
-      }
-      // Adiciona o último artigo
-      if (artigoAtual) {
-        resultado.sumario.artigos.push(artigoAtual);
+    if (artigosMatch) {
+      const artigosHtml = artigosMatch[1];
+      const regexArtigos =
+        /<p[^>]*>\s*<strong>\s*(\d+\s+[^<]+?)\s*<\/strong>\s*<\/p>\s*<p[^>]*>\s*<em>\s*([^<]+?)\s*<\/em>\s*<\/p>/g;
+
+      let m;
+      while ((m = regexArtigos.exec(artigosHtml)) !== null) {
+        resultado.sumario.artigos.push({
+          titulo: m[1].trim(),
+          autor: m[2].trim()
+        });
       }
     }
   }
-  
-  // --- 2. Extração da Carta do IBRE (Bloco 4) ---
-  
-  var regexCarta = /id="block-views-block-revista-conjuntura-block-4"[\s\S]*?field-content">([\s\S]*?)<\/span>[\s\S]*?<a href="(.*?)"/i;
-  var matchCarta = html.match(regexCarta);
-  
-  if (matchCarta) {
-    resultado.cartaIbre.resumo = limparTexto(matchCarta[1]);
-    resultado.cartaIbre.link = matchCarta[2].replace('hreflang="pt-br"', '').trim();
+
+  // ======================================================
+  // CARTA DO IBRE (FORA DO SUMÁRIO) — ORIGINAL
+  // ======================================================
+  const cartaMatch = html.match(
+    /block-views-block-revista-conjuntura-block-4[\s\S]*?<p[^>]*><em><strong>Por\s+([^<]+)<\/strong><\/em><\/p>[\s\S]*?<p[^>]*>([^<]+)/
+  );
+
+  if (cartaMatch) {
+    resultado.cartaIbre.autor = cartaMatch[1].trim();
+    resultado.cartaIbre.resumo = cartaMatch[2].trim();
   }
 
-  // --- 3. Extração da Nota do Editor (Bloco 3) ---
-  
-  var regexNota = /id="block-views-block-revista-conjuntura-block-3"[\s\S]*?field-content">([\s\S]*?)<\/div>[\s\S]*?<a href="(.*?)"/i;
-  var matchNota = html.match(regexNota);
-  
-  if (matchNota) {
-    resultado.notaDoEditor.resumo = limparTexto(matchNota[1]);
-    resultado.notaDoEditor.link = matchNota[2].replace('hreflang="pt-br"', '').trim();
+  const cartaLinkMatch = html.match(
+    /block-views-block-revista-conjuntura-block-4[\s\S]*?<a href="([^"]+)"/
+  );
+  if (cartaLinkMatch) {
+    resultado.cartaIbre.link = cartaLinkMatch[1];
   }
-  
-  // --- 4. Extração da Capa (Bloco 2) ---
 
-  var regexCapa = /id="block-views-block-revista-conjuntura-block-2"[\s\S]*?views-field-field-revista-imagem">[\s\S]*?<img[^>]*src="(.*?)"[\s\S]*?views-field-field-revista-link">[\s\S]*?<a href="(.*?)" class="btn-azul-pequeno f-right"/i;
-  var matchCapa = html.match(regexCapa);
-
-  if (matchCapa) {
-    resultado.capa.imagem = matchCapa[1].trim();
-    resultado.capa.linkRevistaCompleta = matchCapa[2].trim();
+  // ======================================================
+  // NOTA DO EDITOR — ORIGINAL
+  // ======================================================
+  const notaMatch = html.match(
+    /block-views-block-revista-conjuntura-block-3[\s\S]*?<p>([\s\S]*?)<\/p>/
+  );
+  if (notaMatch) {
+    resultado.notaEditor.texto = notaMatch[1].trim();
   }
-  
+
+  const notaLinkMatch = html.match(
+    /block-views-block-revista-conjuntura-block-3[\s\S]*?<a href="([^"]+)"/
+  );
+  if (notaLinkMatch) {
+    resultado.notaEditor.link = notaLinkMatch[1];
+  }
+
+  // ======================================================
+  // CAPA DA REVISTA (IMAGEM + LINK) — ORIGINAL
+  // ======================================================
+  const imagemMatch = html.match(
+    /block-views-block-revista-conjuntura-block-2[\s\S]*?<img[^>]+src="([^"]+)"/
+  );
+  if (imagemMatch) {
+    resultado.capaRevista.imagem = imagemMatch[1];
+  }
+
+  const linkRevistaMatch = html.match(
+    /block-views-block-revista-conjuntura-block-2[\s\S]*?<a href="([^"]+)"[^>]*>Leia a revista completa/
+  );
+  if (linkRevistaMatch) {
+    resultado.capaRevista.link = linkRevistaMatch[1];
+  }
+
   return resultado;
 }
 
@@ -249,8 +306,8 @@ function gerarHtmlEmail(dadosJson) {
   var tituloEdicao = dadosJson.tituloEdicao || "Revista Conjuntura Econômica";
   var sumario = dadosJson.sumario;
   var cartaIbre = dadosJson.cartaIbre || {};
-  var notaDoEditor = dadosJson.notaDoEditor || {};
-  var capa = dadosJson.capa || {};
+  var notaDoEditor = dadosJson.notaEditor || {};
+  var capa = dadosJson.capaRevista || {};
 
   // --- 1. Geração da Lista de Artigos do Sumário (usando o array de artigos) ---
   
@@ -265,12 +322,36 @@ function gerarHtmlEmail(dadosJson) {
   
   // Cria os <li> para as seções fixas (usando os títulos completos do sumário)
   var listaSecoesHtml = `
-    <li><strong>Carta do IBRE:</strong> ${sumario.cartaDoIbre ? sumario.cartaDoIbre.replace('Carta do IBRE | ', '').trim() : "Não disponível"}</li>
-    <li><strong>Ponto de Vista:</strong> ${sumario.pontoDeVista ? sumario.pontoDeVista.replace('Ponto de Vista | ', '').trim() : "Não disponível"}</li>
-    <li><strong>Entrevista:</strong> ${sumario.entrevista ? sumario.entrevista.replace('Entrevista | ', '').trim() : "Não disponível"}</li>
-    <li><strong>Fiscal:</strong> ${sumario.fiscal ? sumario.fiscal.replace('Fiscal | ', '').trim() : "Não disponível"}</li>
-    <li><strong>Capa:</strong> ${sumario.capa ? sumario.capa.replace('CAPA | ', '').trim() : "Não disponível"}</li>
-  `.trim();
+  <li>
+    <strong>Carta do IBRE:</strong><br>
+    <em>${sumario.cartaDoIbre && sumario.cartaDoIbre.titulo ? sumario.cartaDoIbre.titulo.trim() : "Não disponível"}</em><br>
+    ${sumario.cartaDoIbre && sumario.cartaDoIbre.resumo ? sumario.cartaDoIbre.resumo.trim() : ""}
+  </li>
+
+  <li>
+    <strong>Ponto de Vista:</strong><br>
+    <em>${sumario.pontoDeVista && sumario.pontoDeVista.titulo ? sumario.pontoDeVista.titulo.trim() : "Não disponível"}</em><br>
+    ${sumario.pontoDeVista && sumario.pontoDeVista.resumo ? sumario.pontoDeVista.resumo.trim() : ""}
+  </li>
+
+  <li>
+    <strong>Entrevista:</strong><br>
+    <em>${sumario.entrevista && sumario.entrevista.titulo ? sumario.entrevista.titulo.trim() : "Não disponível"}</em><br>
+    ${sumario.entrevista && sumario.entrevista.resumo ? sumario.entrevista.resumo.trim() : ""}
+  </li>
+
+  <li>
+    <strong>Fiscal:</strong><br>
+    <em>Não disponível</em>
+  </li>
+
+  <li>
+    <strong>Capa:</strong><br>
+    <em>${sumario.capa && sumario.capa.titulo ? sumario.capa.titulo.trim() : "Não disponível"}</em><br>
+    ${sumario.capa && sumario.capa.resumo ? sumario.capa.resumo.trim() : ""}
+  </li>
+`.trim();
+
 
   // --- 3. Montagem do Template HTML Completo ---
 
@@ -317,7 +398,7 @@ ${listaArtigosHtml}
 
 <h2>Nota do Editor</h2>
 <div class="content">
-    <p>${notaDoEditor.resumo || "Resumo da Nota do Editor não disponível."}</p>
+    <p>${notaDoEditor.texto || "Resumo da Nota do Editor não disponível."}</p>
     <p><a href="https://portalibre.fgv.br/${notaDoEditor.link || "#"}" class="read-more-link" target="_blank">Ler mais</a></p>
 </div>
 
@@ -325,7 +406,7 @@ ${listaArtigosHtml}
 <div class="capa">
     <img src="https://portalibre.fgv.br/${capa.imagem || "placeholder.jpg"}" alt="Capa da Revista">
 </div>
-<p><a href="${capa.linkRevistaCompleta || "#"}" class="read-more-link" target="_blank">Acessar revista completa</a></p>
+<p><a href="${capa.link || "#"}" class="read-more-link" target="_blank">Acessar revista completa</a></p>
 
 <div class="footer">
     Email gerado automaticamente pelo Google Apps Script.
@@ -437,4 +518,65 @@ function absolutizar(urlOrRel) {
   if (urlOrRel.indexOf('http') === 0) return urlOrRel;
   // concatena com domínio base
   return 'https://portalibre.fgv.br' + (urlOrRel.indexOf('/') === 0 ? urlOrRel : '/' + urlOrRel);
+}
+
+function registrarEnvioPlanilha(mesCorrente, linkRevista) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("controle");
+
+  if (!sheet) {
+    throw new Error("A aba 'controle' não existe.");
+  }
+
+  sheet.appendRow([
+    new Date(),
+    mesCorrente,
+    linkRevista
+  ]);
+}
+
+function jaFoiEnviadoNoMes(mesCorrente) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sheet = ss.getSheetByName("controle");
+
+  if (!sheet) {
+    throw new Error("A aba 'controle' não existe.");
+  }
+
+  const lastRow = sheet.getLastRow();
+  if (lastRow < 2) {
+    Logger.log("Planilha sem registros de envio.");
+    return false;
+  }
+
+  const valores = sheet.getRange(2, 2, lastRow - 1, 1).getValues();
+
+  for (let i = 0; i < valores.length; i++) {
+    let valor = valores[i][0];
+
+    if (!valor) continue;
+
+    // Normaliza qualquer valor para YYYY-MM
+    let mesPlanilha;
+
+    if (valor instanceof Date) {
+      mesPlanilha = Utilities.formatDate(
+        valor,
+        Session.getScriptTimeZone(),
+        "yyyy-MM"
+      );
+    } else {
+      mesPlanilha = String(valor).trim();
+    }
+
+    Logger.log(`Comparando: planilha=${mesPlanilha} | atual=${mesCorrente}`);
+
+    if (mesPlanilha === mesCorrente) {
+      Logger.log("Envio já registrado para este mês.");
+      return true;
+    }
+  }
+
+  Logger.log("Nenhum envio encontrado para este mês.");
+  return false;
 }
