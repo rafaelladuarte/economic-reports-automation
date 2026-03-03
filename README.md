@@ -1,77 +1,95 @@
-# 📡 Automação de Relatórios Econômicos
+# 📡 Economic Reports Automation
 
-**Monitoramento automático de publicações e envio de alertas inteligentes**
+## 🎯 O Problema e o Propósito
+Profissionais do mercado financeiro, pesquisadores e estudantes de economia precisam estar sempre atualizados com a publicação de relatórios econômicos oficiais (como a Carta de Conjuntura do IPEA, Revista Conjuntura Econômica da FGV, Boletim Macro, etc). Fazer essa verificação manualmente entrando site por site diariamente é ineficiente e propenso a falhas, atrasando o acesso à informação em primeira mão.
 
-Este repositório reúne um conjunto de automações desenvolvidas para monitorar **relatórios econômicos publicados por instituições oficiais** e enviar notificações automáticas quando novos documentos forem disponibilizados.
+Este projeto de Engenharia de Dados propõe solucionar esse problema através de um pipeline automatizado que monitora os principais portais de publicações econômicas, extrai novas publicações assim que são lançadas e consolida essas informações em uma newsletter formatada em HTML, enviada diretamente para o e-mail do usuário.
 
-O projeto é modular, expansível e construído inteiramente com **Google Apps Script (GAS)**, permitindo operações em nuvem, baixo custo e execução totalmente automatizada. Atualmente, o primeiro módulo monitora a **Carta de Conjuntura do IPEA**, mas novos relatórios serão adicionados ao longo do desenvolvimento.
+## 🏗️ Sobre o Projeto e Arquitetura do ETL
+O projeto implementa um pipeline clássico de extração, transformação e carregamento (ETL), focado na captura de dados não-estruturados (HTML) e orquestrado para funcionar de maneira programada e autônoma.
 
-## 🎯 Propósito do Projeto
+O fluxo de dados consiste em:
+1. **Extract**: Acessar os portais via web scraping simulando clientes legítimos, criando sessões HTTP robustas (com retry e negociação moderna de TLS).
+2. **Transform**: Processar a árvore da página (parseamento via BeautifulSoup) mapeando elementos de interesse (títulos, links dos PDFs e sumários de publicações) e estruturar os dados com classes em Python.
+3. **Load**: Carregar e injetar os dados extraídos em templates de UI (via Jinja2), montando a newsletter em formato HTML, que por fim aciona uma API via HTTP para o disparo do alerta em tempo real.
 
-A automação foi criada para resolver um desafio recorrente: **acompanhar publicações econômicas importantes sem depender de verificações manuais diárias**.
+**Diagrama de Arquitetura:**
 
-A solução:
+```mermaid
+graph TD
+    A[Fontes de Dados<br>Instituições Oficiais] -->|Web Scraping<br>requests + BS4| B(Extract)
+    B -->|Parsing & Limpeza| C(Transform)
+    C -->|Dados Estruturados| D(Jinja2 Renderer)
+    D -->|Newsletter HTML| E(Load / Notification)
+    E -->|API MailerSend| F[Caixa de Entrada do Usuário]
+    
+    subgraph Orquestração e Infraestrutura
+        G[Apache Airflow 3<br>Docker Containers] -.->|Agenda e monitora DAGs| B
+    end
+```
 
-* Monitora páginas oficiais de relatórios econômicos.
-* Identifica novas publicações na data atual.
-* Extrai informações relevantes (título, data, resumo e links).
-* Envia um **e-mail automático em HTML** com os detalhes.
-* Evita notificações redundantes ao ignorar dias sem novas publicações.
+## 🧩 Pipelines Disponíveis
 
-Ideal para quem trabalha com dados, pesquisa econômica, análise de conjuntura ou rotina baseada em documentos oficiais.
+A arquitetura do projeto foi desenhada com componentes modulares (ex: `BaseExtractor`). Isso permite um ciclo rápido de desenvolvimento de novos crawlers para integrar o ecossistema. 
 
-## 🧩 Estrutura Modular do Projeto
+| DAG | Fonte da Publicação | Frequência | Status |
+|-----|-------|-----------|--------|
+| `fgv_newsletter_pipeline` | [Revista Conjuntura Econômica — FGV](https://portalibre.fgv.br/revista-conjuntura-economica) | Semanal (`@weekly`) | ✅ Ativo |
 
-Cada relatório econômico monitorado possui seu próprio módulo independente.
-**Módulos atuais:**
+O pipeline já considera atualizações do repositório para adicionar relatórios do IPEA e Banco Central em breve.
 
-* 📄 *[Carta de Conjuntura — IPEA](https://www.ipea.gov.br/cartadeconjuntura/)*
-* 📄 *[Revista Conjuntura Econômica — FGV](https://portalibre.fgv.br/revista-conjuntura-economica)*
+## 🛠️ Stack de Tecnologias
 
-**Próximos módulos planejados:**
+Para construir um ambiente escalável, versionável e tolerante à falha, foram escaladas as seguintes tecnologias:
 
-* 📊 *[Boletim Macro- FGV](https://portalibre.fgv.br/boletim-macro)*
-* 🏛️ *[Estudos Especiais - Banco Central](https://www.bcb.gov.br/publicacoes/estudosespeciais)*
-* 📈 Relatórios e boletins adicionais de instituições públicas e privadas
+- **Linguagem Principal**: Python 3.12+
+- **Orquestração**: Apache Airflow 3
+- **Infraestrutura e Containerização**: Docker & Docker Compose (PostgreSQL 16 base do Airflow)
+- **Extração de Dados**: `requests`, `urllib3` (HttpAdapter/Retry), `BeautifulSoup4`
+- **Renderização de Lógica de Layout**: Jinja2
+- **Gerenciador de Dependências**: Poetry (exportado para requirements em produção)
+- **Serviço de E-mail**: MailerSend API
+- **Gerenciamento de Configuração**: `pydantic-settings` (.env management)
 
-## 🛠️ Tecnologias Utilizadas
+## ⚙️ Como Configurar e Executar
 
-O projeto funciona inteiramente dentro do ecossistema Google utilizando:
+### Pré-requisitos
+- Docker e Docker Compose instalados no ambiente de Host.
+- Conta válida no [MailerSend](https://www.mailersend.com/) (com uma API Key gerada).
 
-| Tecnologia / Serviço         | Função                                                                |
-| ---------------------------- | --------------------------------------------------------------------- |
-| **Google Apps Script (GAS)** | Ambiente de execução baseado em JavaScript.                           |
-| **JavaScript (JS)**          | Implementa lógica, parsing, regras e modularização.                   |
-| **UrlFetchApp**              | Faz requisições HTTP para buscar o conteúdo das páginas.              |
-| **RegEx**                    | Extrai dados específicos do HTML quando não há DOM Parser disponível. |
-| **GmailApp**                 | Envia e-mails em HTML para o usuário.                                 |
-| **Time-driven Triggers**     | Executa a automação diariamente ou em intervalos definidos.           |
+### 1. Clone o repositório
+```bash
+git clone https://github.com/rafaelladuarte/economic-reports-automation.git
+cd economic-reports-automation
+```
 
-## 📬 Como Funciona
+### 2. Configure as variáveis de ambiente base
+Crie ou copie o arquivo `.env` para a raiz do repositório. Ele será usado pydantic e também pelo Docker. Exemplo de conteúdo do `.env`:
 
-1. O script acessa a página de um relatório econômico.
-2. Verifica se há uma nova publicação na data atual.
-3. Extrai:
+```env
+# MailerSend (Serviço de disparo)
+MAILERSEND_API_KEY=mlsn.xxxxxxxxxxxxxxxxxxxx
+MAILERSEND_DOMAIN=seu-dominio.mlsender.net
+MAILERSEND_RECIPIENT=seu@email.com
 
-   * Título
-   * Data
-   * Resumo
-   * Link da página
-   * Link do PDF (quando disponível)
-4. Gera um e-mail estruturado em HTML.
-5. Envia o alerta automático ao usuário.
+# Contexto de permissão Docker & Airflow
+AIRFLOW_UID=50000
+```
 
-## 🚀 Roadmap
+### 3. Deploy dos Componentes via Docker
+Faça o build da imagem custom do Airflow que vai embutir as dependências do projeto listadas nos requirimentos:
 
-* Adição de novos relatórios econômicos (FGV, BACEN, IPEA e outros).
-* Implementação de **resumos automáticos com modelos de linguagem (LLM)**.
-* Exportação de dados para planilhas Google de forma estruturada.
+```bash
+docker compose up -d --build
+```
+> *Nota: Na primeira emersão do ambiente, o contêiner `airflow-init` rodará todas as migrações do PostgreSQL e criará as credenciais de admin (`airflow` / `airflow`). Vá para `localhost:8080` para acompanhar as execuções.*
 
-## ⚙️ Como Configurar
+### 4. Execuções Locais (Testes e Dev sem Airflow)
+Caso precise rodar a engine sem subir o orquestrador (facilitar os testes dos Extratores ou edição do template HTML da newsletter):
+```bash
+poetry install
+poetry run python test_fgv.py
+```
 
-1. Crie um novo projeto no Google Apps Script.
-2. Copie o código do módulo desejado (ex.: `ipea_carta_conjuntura.js`).
-3. Configure um **gatilho de tempo** para rodar a função principal do módulo.
-4. Na primeira execução, conceda as permissões solicitadas:
-   * UrlFetchApp
-   * GmailApp
+## 📄 Licença
+Este projeto possui os termos da licença [MIT](LICENSE).
