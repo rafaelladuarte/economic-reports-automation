@@ -1,11 +1,11 @@
 from datetime import datetime
 from airflow import DAG
-from airflow.decorators import task
-from airflow.operators.python import get_current_context
+from airflow.sdk import task
 
 from src.extractors.fgv_extractor import FgvExtractor
 from src.newsletter.renderer import HtmlRenderer
-from src.load.email_sender import MailgunEmailSender
+from src.newsletter.email_sender import MailerSendEmailSender
+from src.config.settings import settings
 
 
 default_args = {
@@ -17,7 +17,7 @@ default_args = {
 with DAG(
     dag_id="fgv_newsletter_pipeline",
     start_date=datetime(2024, 1, 1),
-    schedule_interval="@weekly",
+    schedule="@weekly",
     catchup=False,
     default_args=default_args,
     tags=["newsletter", "fgv"],
@@ -27,41 +27,35 @@ with DAG(
     def extract():
         extractor = FgvExtractor()
         raw_html = extractor.fetch()
-        items = extractor.parse(raw_html)
+        items = extractor._parse(raw_html)
         return items
-
 
     @task
     def render(items: dict):
         renderer = HtmlRenderer(template_path="src/newsletter/templates")
-
-        html_rendered = renderer.render_from_file(
-            "fgv_templates.html",
-            items
-        )
+        html_rendered = renderer.render_from_file("fgv_templates.html", items)
 
         file_path = "/tmp/preview.html"
         renderer.save(html_rendered, file_path)
 
         return file_path
 
-
     @task
     def send_email(file_path: str):
-        sender = MailgunEmailSender(
-            domain="sandboxXXXX.mailgun.org"
+        sender = MailerSendEmailSender(
+            api_key=settings.MAILERSEND_API_KEY,
+            from_email=f"test@{settings.MAILERSEND_DOMAIN}",
+            from_name="FGV Newsletter",
         )
 
         with open(file_path, "r", encoding="utf-8") as f:
             html_content = f.read()
 
-        sender.send_html_email(
-            to_address="seuemail@gmail.com",
+        sender.send(
+            to=[{"email": settings.MAILERSEND_RECIPIENT, "name": "Rafaella"}],
             subject="FGV Newsletter",
             html_content=html_content,
-            text_fallback="Visualize esta newsletter em um cliente compatível com HTML."
         )
-
 
     items = extract()
     rendered_file = render(items)
