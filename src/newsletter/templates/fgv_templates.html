@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8" />
+    <title>{{ tituloEdicao }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background: #f8f8f8;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            max-width: 800px;
+            margin: auto;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        h1 {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 8px;
+            border-bottom: 2px solid #0056b3;
+            padding-bottom: 5px;
+        }
+
+        h2 {
+            font-size: 18px;
+            color: #0056b3;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 4px;
+            margin-top: 28px;
+        }
+
+        ul {
+            padding-left: 18px;
+            line-height: 1.4;
+            margin-bottom: 20px;
+        }
+
+        ul li {
+            margin-bottom: 5px;
+        }
+
+        .capa img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 6px;
+            margin: 10px 0;
+            display: block;
+        }
+
+        .footer {
+            margin-top: 30px;
+            padding: 12px;
+            background: #efefef;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            border-radius: 0 0 8px 8px;
+        }
+
+        .content p {
+            margin-bottom: 15px;
+            line-height: 1.5;
+        }
+
+        .read-more-link {
+            display: inline-block;
+            margin-top: 5px;
+            background-color: #007bff;
+            color: white !important;
+            padding: 8px 15px;
+            text-decoration: none;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+
+        <h1>{{ tituloEdicao }}</h1>
+
+        <h2>Sumário da Edição</h2>
+        <ul>
+            {% if sumario.cartaDoIbre %}
+            <li><strong>Carta do IBRE:</strong> {{ sumario.cartaDoIbre }}</li>
+            {% endif %}
+            {% if sumario.pontoDeVista %}
+            <li><strong>Ponto de Vista:</strong> {{ sumario.pontoDeVista }}</li>
+            {% endif %}
+            {% if sumario.entrevista %}
+            <li><strong>Entrevista:</strong> {{ sumario.entrevista }}</li>
+            {% endif %}
+            {% if sumario.capa %}
+            <li><strong>Capa:</strong> {{ sumario.capa }}</li>
+            {% endif %}
+        </ul>
+
+        <h2>Lista de Artigos</h2>
+        <ul>
+            {% for artigo in sumario.artigos %}
+            <li>{{ artigo }}</li>
+            {% else %}
+            <li>Nenhum artigo disponível.</li>
+            {% endfor %}
+        </ul>
+
+        <h2>Carta do IBRE</h2>
+        <div class="content">
+            <p>{{ cartaIbre.resumo or "Resumo da Carta do IBRE não disponível." }}</p>
+            <p>
+                <a href="{{ cartaIbre.link or '#' }}" class="read-more-link" target="_blank">
+                    Ler mais
+                </a>
+            </p>
+        </div>
+
+        <h2>Nota do Editor</h2>
+        <div class="content">
+            <p>{{ notaEditor.texto or "Resumo da Nota do Editor não disponível." }}</p>
+            <p>
+                <a href="{{ notaEditor.link or '#' }}" class="read-more-link" target="_blank">
+                    Ler mais
+                </a>
+            </p>
+        </div>
+
+        <h2>Capa</h2>
+        <div class="capa">
+            <img src="{{ capaRevista.imagem or 'placeholder.jpg' }}" alt="Capa da Revista">
+        </div>
+        <p>
+            <a href="{{ capaRevista.link or '#' }}" class="read-more-link" target="_blank">
+                Acessar revista completa
+            </a>
+        </p>
+
+        <div class="footer">
+            Newsletter gerada automaticamente pelo pipeline Python.
+        </div>
+
+    </div>
+</body>
+
+</html>
