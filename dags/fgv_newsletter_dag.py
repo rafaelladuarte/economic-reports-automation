@@ -5,7 +5,7 @@ from airflow.operators.python import get_current_context
 
 from src.extractors.fgv_extractor import FgvExtractor
 from src.newsletter.renderer import HtmlRenderer
-from src.email.sender import MailgunEmailSender
+from src.load.email_sender import MailgunEmailSender
 
 
 default_args = {
