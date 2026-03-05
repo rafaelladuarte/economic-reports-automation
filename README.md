@@ -15,18 +15,7 @@ O fluxo de dados consiste em:
 
 **Diagrama de Arquitetura:**
 
-```mermaid
-graph TD
-    A[Fontes de Dados<br>Instituições Oficiais] -->|Web Scraping<br>requests + BS4| B(Extract)
-    B -->|Parsing & Limpeza| C(Transform)
-    C -->|Dados Estruturados| D(Jinja2 Renderer)
-    D -->|Newsletter HTML| E(Load / Notification)
-    E -->|API MailerSend| F[Caixa de Entrada do Usuário]
-    
-    subgraph Orquestração e Infraestrutura
-        G[Apache Airflow 3<br>Docker Containers] -.->|Agenda e monitora DAGs| B
-    end
-```
+<img src="m-economics-report.png" alt="Arquitetura do projeto" width="600">
 
 ## 🧩 Pipelines Disponíveis
 
